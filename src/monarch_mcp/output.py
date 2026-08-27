@@ -76,7 +76,7 @@ def nested_rows(key: str, row_fn: Callable[[dict[str, Any]], dict[str, Any]]) ->
     return lambda value: [row_fn(item) for item in g(value, key, [])]
 
 
-def details(detail_fn: Callable[[dict[str, Any]], dict[str, Any]]) -> SummaryFn:
+def details(detail_fn: Callable[[Any], Any]) -> SummaryFn:
     return lambda value: None if value is None else detail_fn(value)
 
 

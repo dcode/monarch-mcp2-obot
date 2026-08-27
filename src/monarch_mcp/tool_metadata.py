@@ -10,6 +10,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from monarch_mcp.output import OutputMode, shape_output
+from monarch_mcp.reauth import call_with_reauth
 from monarch_mcp.serialization import raw_output
 
 READ_PREFIXES = ("download_", "get_", "list_", "load_", "search_")
@@ -76,7 +77,7 @@ def _with_output_controls(tool_name: str, function: Callable[..., Any]) -> Calla
         **kwargs: Any,
     ) -> Any:
         with raw_output(output_mode == "raw"):
-            result = function(*args, **kwargs)
+            result = call_with_reauth(tool_name, function, args, kwargs)
         return shape_output(tool_name, result, output_mode=output_mode, fields=fields)
 
     wrapped.__signature__ = _signature_with_output_controls(function)  # type: ignore[attr-defined]

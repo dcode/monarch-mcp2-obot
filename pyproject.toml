@@ -4,44 +4,122 @@ build-backend = "hatchling.build"
 
 [project]
 name = "monarch-mcp2-obot"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Single-tenant Monarch Money MCP server for self-hosting behind obot, forked from erikrubstein/monarch-mcp2 and ported to MCP Python SDK v2 (MCPServer)."
 readme = "README.md"
+license = "MIT"
+authors = [{ name = "Derek Ditch", email = "dcode@users.noreply.github.com" }]
 requires-python = ">=3.12"
-license = { text = "MIT" }
+keywords = [
+  "mcp",
+  "model-context-protocol",
+  "monarch-money",
+  "personal-finance",
+  "obot",
+  "llm-tools",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Office/Business :: Financial",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
 dependencies = [
   "mcp[cli]>=2.1.0,<3",
   "monarch-api2 @ git+https://github.com/erikrubstein/monarch-api2.git@v0.2.0",
   "pyotp>=2.9,<3",
 ]
 
+[project.urls]
+Homepage = "https://github.com/dcode/monarch-mcp2-obot"
+Documentation = "https://dcode.github.io/monarch-mcp2-obot/"
+Repository = "https://github.com/dcode/monarch-mcp2-obot"
+Issues = "https://github.com/dcode/monarch-mcp2-obot/issues"
+Changelog = "https://github.com/dcode/monarch-mcp2-obot/releases"
+
 [project.scripts]
 monarch-mcp = "monarch_mcp.server:main"
 
 [project.optional-dependencies]
 dev = [
+  "mypy>=1.13",
+  "pre-commit>=4.0",
   "pytest>=8.0",
   "pytest-asyncio>=0.24",
+  "pytest-cov>=6.0",
   "ruff>=0.8",
-  "mypy>=1.13",
 ]
+docs = ["zensical>=0.0.50"]
+
+# ---------------------------------------------------------------------------
+# Hatch
+# ---------------------------------------------------------------------------
+
+[tool.hatch.version]
+path = "src/monarch_mcp/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/monarch_mcp"]
 
 [tool.hatch.metadata]
+# monarch-api2 has no PyPI release; this fork pins it straight to a tagged
+# commit on GitHub instead. This is required for local/uvx/Docker installs
+# but is NOT accepted by PyPI's upload validation (direct/VCS references
+# in Requires-Dist are rejected) -- see the "Publishing to PyPI" note in
+# ROADMAP.md before trying to actually push this package there.
 allow-direct-references = true
+
+[tool.hatch.envs.default]
+installer = "uv"
+features = ["dev"]
+
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+cov = "pytest --cov=src --cov-report=term-missing {args:tests}"
+lint = ["ruff check .", "ruff format --check .", "mypy src"]
+fmt = ["ruff check --fix .", "ruff format ."]
+typecheck = "mypy src"
+
+# ---------------------------------------------------------------------------
+# Pytest / coverage
+# ---------------------------------------------------------------------------
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+# Upstream's group modules (inherited from monarch-mcp2, not re-audited as
+# part of this fork) and output.py's long tail of per-tool summary shapers
+# bring the honest baseline to ~80%, not 100% -- see ROADMAP.md "Known
+# gaps". This gate exists to catch regressions in the code this fork
+# actually maintains, not to claim full coverage that isn't there.
+fail_under = 78
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]
+
+# ---------------------------------------------------------------------------
+# Ruff
+# ---------------------------------------------------------------------------
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
+select = ["E", "F", "I", "UP", "B", "BLE", "C4", "SIM", "ASYNC", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
 # UP040 wants `type X = Literal[...]` (PEP 695) instead of `X: TypeAlias =
@@ -54,11 +132,20 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
 # "helpfully" re-apply this fix without re-checking generated schemas.
 "src/monarch_mcp/schemas.py" = ["UP040"]
 
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ---------------------------------------------------------------------------
+# Mypy
+# ---------------------------------------------------------------------------
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
+warn_unreachable = true
 disallow_untyped_defs = true
 
 # monarch-api2 ships no py.typed marker / stubs (it's erikrubstein's
@@ -66,5 +153,5 @@ disallow_untyped_defs = true
 # it is still exercised by the test suite; this only silences the
 # import-untyped noise, it doesn't skip checking our own code.
 [[tool.mypy.overrides]]
-module = "monarch_api"
+module = "monarch_api.*"
 ignore_missing_imports = true

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
+from monarch_api import TransactionReviewStatus
 from monarch_api import (
     create_transaction as api_create_transaction,
 )
@@ -162,7 +163,7 @@ def update_transaction(
     )
 
 
-def review_status_(value: str | None):
+def review_status_(value: str | None) -> TransactionReviewStatus | None:
     return review_status(value)
 
 

@@ -72,19 +72,88 @@ Not aspirational — each of these was actually run during this session:
   tools (125 inherited + `auth_login` + `auth_status`), zero of which
   expose `session_path`.
 
+## Status: done in this session (2026-08-27 — professionalization pass)
+
+Also verified by actually running things — mypy/ruff/pytest output pasted
+into this session, `zensical build --clean --strict` run against the docs,
+`pre-commit run --all-files` run against the whole repo.
+
+- [x] **`mypy --strict` extended to the entire `src/` tree** (26 files, up
+      from the 5 this fork originally touched). Fixed the real typing gaps
+      this surfaced rather than carving out more exclusions:
+      `converters.py`'s filter/enum helpers now take a proper
+      `Mapping[str, Any] | BaseModel` union (`InputMapping`) instead of an
+      untyped `data`, `output.py::details()` takes `Callable[[Any], Any]`
+      instead of a too-narrow `dict`-only signature, `report_groups` takes
+      `Sequence[str]` instead of `list[str]` (the original was invariant
+      and rejected `list[Literal[...]]`), and a couple of missing return
+      annotations (`review_status_`) got filled in. `monarch_api.*`'s
+      missing-stubs override was widened from `monarch_api` to
+      `monarch_api.*` so it actually covers the submodules being imported.
+- [x] **Re-auth-on-401 wrapper**, addressing the gap noted below:
+      `reauth.py::call_with_reauth` wraps every non-`auth_*` tool call.
+      Since monarch-api2 doesn't preserve HTTP status codes on failures
+      (see its `functions/common.py::_parse_response` — every 4xx/5xx
+      becomes a bare `MonarchError` with only the parsed message), this
+      matches the error message against known expired-session wording
+      rather than a status code. One retry max; only fires when
+      `MONARCH_EMAIL`/`MONARCH_PASSWORD` are configured; never masks a
+      genuine error. See docs/authentication.md for the exact rules.
+- [x] **`_FILE`-suffixed secrets support**
+      (`MONARCH_PASSWORD_FILE`/`MONARCH_TOTP_SECRET_FILE`) in `config.py`,
+      following the `POSTGRES_PASSWORD_FILE`-style convention Docker's
+      official images use — lets a deployment mount a secret as a file
+      (Docker/Kubernetes secret mounts) instead of putting the value
+      directly in the process environment. Partial answer to the "TOTP
+      secret handling is minimal" gap below; still no at-rest encryption
+      layered on top by this fork itself, by design (a deployment-layer
+      concern, not this server's).
+- [x] **GitHub Actions**: `lint.yml` (ruff check + format + mypy),
+      `test.yml` (pytest + coverage, 3.12/3.13 matrix), `docs.yml` (zensical
+      build → GitHub Pages on push to `main`), `publish.yml` (build +
+      PyPI publish, `workflow_dispatch`-only — see "Publishing to PyPI"
+      below for why this isn't wired to `release: published`).
+- [x] **Pre-commit** (`.pre-commit-config.yaml`): the pre-commit-hooks
+      hygiene set, ruff + ruff-format, and local mypy/pytest hooks —
+      mirrors CI so failures surface before a push, not after.
+- [x] **Docs site** (Zensical, `zensical.toml` + `docs/`): Overview,
+      Installation, Configuration, Authentication, Tools, Development.
+      Builds clean under `zensical build --clean --strict` (zero warnings).
+      Deployed via `docs.yml` to GitHub Pages.
+- [x] **`pyproject.toml` filled out for PyPI**: `dynamic` version sourced
+      from `__init__.py` (single source of truth, was duplicated before),
+      `authors`, `keywords`, full `classifiers`, `project.urls`
+      (Homepage/Documentation/Repository/Issues/Changelog), a `docs` extra,
+      `py.typed` marker added to the package. See "Publishing to PyPI"
+      below for the one thing that still blocks an actual upload.
+- [x] **Coverage gate** added (`pytest-cov`, `[tool.coverage]` in
+      `pyproject.toml`, `fail_under = 78`, current baseline ~80%) — catches
+      regressions without pretending the inherited-code baseline is 100%.
+- [x] **`LICENSE` updated** with a second copyright line for this fork's
+      own additions; **`NOTICE.md` added**, spelling out exactly which
+      pieces come from upstream (Erik Rubstein) vs. this fork (Derek
+      Ditch).
+- [x] Pushed to a real remote: `https://github.com/dcode/monarch-mcp2-obot`
+      (the README's `uvx --from git+...` placeholder is now the real URL).
+
+## Publishing to PyPI
+
+The metadata is ready, but an actual `pypi-publish` will fail: this project
+depends on `monarch-api2` via a direct GitHub reference (`@ git+https://...`
+in `dependencies`, `allow-direct-references = true` in
+`[tool.hatch.metadata]`), because `monarch-api2` has no PyPI release to
+depend on instead. PyPI's upload validation rejects any package whose
+metadata contains a direct/VCS `Requires-Dist` line — this isn't a bug in
+this fork's setup, it's PyPI's policy. `publish.yml` is `workflow_dispatch`
+only (not triggered by `release: published`) specifically so this doesn't
+silently fail on every tagged release. Two ways to actually unblock a PyPI
+upload, neither of which is this fork's call to make unilaterally: get
+`monarch-api2` published to PyPI (upstream, `erikrubstein/monarch-api2`) and
+re-pin the dependency to that; or vendor/fork `monarch-api2` under this
+project's own namespace and publish that instead.
+
 ## Known gaps / deliberately deferred
 
-- **Not pushed to a git remote.** This was built and verified in a local
-  checkout. Push it wherever you want it to live, then update the README's
-  "Running it" section (the `uvx --from git+...` URL is a placeholder).
-- **`mypy --strict` was scoped to the 5 files this fork touched**
-  (`auth_runtime.py`, `config.py`, `server.py`, `groups/auth.py`,
-  `tool_metadata.py`), not the 13 inherited group modules or
-  `schemas.py`/`output.py`/`serialization.py`/`converters.py`. Those came
-  from upstream as-is; running strict mypy across the whole tree is a
-  reasonable next step if you want the whole codebase held to that bar,
-  but budget time for it — there's a real behavioral trap in there (see
-  next bullet).
 - **`schemas.py` intentionally does NOT use PEP 695 `type X = ...`
   aliases**, even though `ruff --fix` will offer to convert them and it
   looks like a harmless modernization. It isn't: a `type` statement
@@ -96,22 +165,23 @@ Not aspirational — each of these was actually run during this session:
   If a future Pydantic version changes this, the suppression can go — but
   verify against `test_server_exposes_typed_input_schemas` first, don't
   just trust ruff.
-- **TOTP secret handling is minimal.** It's read from an env var and used
-  in-memory; nothing here encrypts it at rest beyond whatever obot/Docker
-  secret handling you configure. If that's not sufficient for your threat
-  model, consider a secrets manager reference instead of a raw env var —
-  that's a deployment-layer decision, not something this fork enforces.
+- **TOTP secret handling has no at-rest encryption.** The `_FILE` variants
+  above avoid putting the raw value in the process environment, but
+  whatever's on the other end of that file (or the env var, if you're not
+  using `_FILE`) is still this fork's problem only up to "read it and use
+  it in-memory" — actual secrets-manager integration (Vault, age/sops,
+  cloud KMS-backed mounts, ...) is a deployment-layer decision this fork
+  deliberately doesn't own.
 - **Email-code MFA has no automation path.** Only authenticator-app
   (TOTP-seed) MFA can be fully unattended. If Monarch challenges with an
   emailed code instead, `auth_login` still works but needs a human to
   relay the code via its `mfa_code` argument each time.
-- **No re-auth-on-401 wrapper around the 125 inherited tools.** If a
-  session expires mid-use, individual tool calls will fail with whatever
-  error `monarch-api2` raises (surfaces as an MCP tool execution error,
-  not a silent `is_error` result — v2 propagates handler exceptions
-  directly, unlike v1). `auth_status` can confirm this; nothing currently
-  auto-retries a failed call after a fresh login. Worth adding if expired
-  sessions turn out to be a frequent annoyance in practice.
+- **The re-auth-on-401 wrapper is message-based, not status-code-based**
+  (see "Status: done in this session" above for why — monarch-api2 doesn't
+  preserve status codes). An unusually-worded 401 from Monarch's API could
+  in principle not match `reauth.py`'s known-marker list and fall through
+  to the old plain-error behavior. Widen `_EXPIRED_SESSION_MARKERS` if a
+  real 401 message is observed that doesn't match.
 - **List-shaped tool results changed shape under v2**, independent of
   anything this fork did: MCPServer v2 emits one `TextContent` block per
   list element instead of one block containing a JSON array (v1's
@@ -119,16 +189,25 @@ Not aspirational — each of these was actually run during this session:
   double assumed a single array). MCP clients generally handle multiple
   content blocks fine, but if something downstream assumes "one JSON
   blob per tool call," it'll need to handle multiple blocks instead.
-- **No CI configured.** `pyproject.toml` has ruff/mypy/pytest ready to
-  run; wiring them into GitHub Actions (or wherever this ends up hosted)
-  wasn't part of this session's scope.
+- **Coverage floor is 78%, not 100%.** The inherited group modules and
+  `output.py`'s long tail of per-tool summary shapers weren't written with
+  100%-coverage testing in mind; closing that gap is real test-writing
+  effort, not a config change.
+- **PyPI publish is blocked** on `monarch-api2` getting its own PyPI
+  release — see "Publishing to PyPI" above.
 
 ## Possible next steps (not started)
 
-- Re-auth-on-401 wrapper (see above) if it turns out to matter in
-  practice, rather than pre-building it speculatively.
-- Extend `mypy --strict` to the rest of the tree.
-- CI workflow (lint + typecheck + test on push).
-- Decide on and document a secrets-manager story for
-  `MONARCH_PASSWORD`/`MONARCH_TOTP_SECRET` if the plain-env-var approach
-  isn't sufficient for how this gets deployed.
+- Close the coverage gap on `output.py` (55% today, the biggest single
+  contributor to the 80%-not-100% baseline) and the inherited group
+  modules, then raise `fail_under` to match.
+- If `monarch-api2` gets a PyPI release, re-pin `dependencies` to it,
+  drop `allow-direct-references`, and switch `publish.yml` back to
+  `release: published`.
+- If a real Monarch 401 message is ever observed that
+  `reauth.py::_EXPIRED_SESSION_MARKERS` doesn't match, add it — this is
+  meant to grow from observed behavior, not be guessed exhaustively
+  up front.
+- A secrets-manager integration beyond the `_FILE` convention (Vault,
+  cloud KMS, ...) if plain file-mounted secrets aren't sufficient for a
+  given deployment's threat model.

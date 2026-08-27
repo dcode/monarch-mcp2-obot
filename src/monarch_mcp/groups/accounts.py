@@ -40,7 +40,9 @@ from monarch_mcp.session import require_session
 from monarch_mcp.tool_metadata import register_api_tool
 
 
-def account_filter_from_dict(filters: dict[str, Any] | None) -> AccountFilter | None:
+def account_filter_from_dict(
+    filters: AccountFilterInput | dict[str, Any] | None,
+) -> AccountFilter | None:
     if filters is None:
         return None
     if isinstance(filters, AccountFilterInput):

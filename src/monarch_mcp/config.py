@@ -23,6 +23,16 @@ PASSWORD_ENV = "MONARCH_PASSWORD"
 #: interactively, or a session file can be provisioned out of band.
 TOTP_SECRET_ENV = "MONARCH_TOTP_SECRET"
 
+#: `_FILE`-suffixed counterparts, following the convention used by the
+#: official Docker images (e.g. `POSTGRES_PASSWORD_FILE`) and Docker/Kubernetes
+#: secret mounts: point one of these at a file (a mounted secret, an
+#: age/sops-decrypted path, etc.) instead of putting the value directly in
+#: the process environment, where it can leak via `docker inspect`, `/proc`,
+#: or a crash-dump/log capturing env state. When both a value and a file are
+#: set for the same credential, the file wins.
+PASSWORD_FILE_ENV = "MONARCH_PASSWORD_FILE"
+TOTP_SECRET_FILE_ENV = "MONARCH_TOTP_SECRET_FILE"
+
 #: Transport selection for obot. Command/uvx-based MCP servers in obot talk
 #: over stdio; obot's Docker-based deployment model instead expects a port
 #: and an HTTP/SSE (streamable-http) endpoint. Default to stdio so running
@@ -57,16 +67,30 @@ def resolve_session_path(session_path: str | Path | None = None) -> Path:
     return Path(session_path).expanduser()
 
 
+def _read_secret_file(path: str) -> str:
+    contents = Path(path).expanduser().read_text(encoding="utf-8").strip()
+    if not contents:
+        raise ValueError(f"Secret file {path!r} is empty.")
+    return contents
+
+
+def _configured_secret(value_env: str, file_env: str) -> str | None:
+    file_path = os.environ.get(file_env)
+    if file_path:
+        return _read_secret_file(file_path)
+    return os.environ.get(value_env) or None
+
+
 def configured_email() -> str | None:
     return os.environ.get(EMAIL_ENV) or None
 
 
 def configured_password() -> str | None:
-    return os.environ.get(PASSWORD_ENV) or None
+    return _configured_secret(PASSWORD_ENV, PASSWORD_FILE_ENV)
 
 
 def configured_totp_secret() -> str | None:
-    return os.environ.get(TOTP_SECRET_ENV) or None
+    return _configured_secret(TOTP_SECRET_ENV, TOTP_SECRET_FILE_ENV)
 
 
 def transport() -> Transport:

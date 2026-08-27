@@ -1,12 +1,19 @@
 # monarch-mcp2-obot
 
+[![Lint](https://github.com/dcode/monarch-mcp2-obot/actions/workflows/lint.yml/badge.svg)](https://github.com/dcode/monarch-mcp2-obot/actions/workflows/lint.yml)
+[![Tests](https://github.com/dcode/monarch-mcp2-obot/actions/workflows/test.yml/badge.svg)](https://github.com/dcode/monarch-mcp2-obot/actions/workflows/test.yml)
+[![Documentation](https://github.com/dcode/monarch-mcp2-obot/actions/workflows/docs.yml/badge.svg)](https://dcode.github.io/monarch-mcp2-obot/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A single-tenant Monarch Money MCP server for self-hosting behind [obot](https://obot.ai),
 forked from [erikrubstein/monarch-mcp2](https://github.com/erikrubstein/monarch-mcp2)
 (itself not a fork of the more commonly-seen `robcerda/monarch-mcp-server` family —
 it's an independent implementation backed by its own API client,
 [monarch-api2](https://github.com/erikrubstein/monarch-api2)).
 
-This fork exists for three reasons upstream didn't cover:
+**Full documentation:** <https://dcode.github.io/monarch-mcp2-obot/>
+
+This fork exists for four reasons upstream didn't cover:
 
 1. **Ported to MCP Python SDK v2** (`MCPServer`, not the deprecated v1 `FastMCP`).
 2. **A login workflow built for obot**: credentials configured once as
@@ -16,6 +23,9 @@ This fork exists for three reasons upstream didn't cover:
 3. **Deliberately single-tenant**: exactly one Monarch account per running
    instance. No tool call can target a different account's session, even
    if a client tried to send one — see "Single-tenant, on purpose" below.
+4. **Resilient to session expiry**: a tool call that fails because the saved
+   session expired is retried once, transparently, after a fresh login — see
+   "Automatic re-login on session expiry" below.
 
 Not affiliated with, endorsed by, or supported by Monarch Money.
 
@@ -59,6 +69,18 @@ account's MFA method is an authenticator app; email-code MFA isn't
 automatable this way (there's no seed to compute a code from) and still
 needs a human to relay a fresh code via `auth_login`'s `mfa_code` argument.
 
+### Automatic re-login on session expiry
+
+If a saved session expires mid-use, every tool call now goes through a
+re-login retry (`reauth.py`): a failure that looks like an expired/invalid
+session (matched against the wording Monarch's API is known to return for a
+401) triggers one fresh login and one retry of the original call, if
+credentials are configured. `auth_*` tools are exempt (retrying a login
+failure by logging in again would just mask the real error), and this never
+retries more than once — see the docs' [Authentication
+page](https://dcode.github.io/monarch-mcp2-obot/authentication/#automatic-re-login-on-session-expiry)
+for the exact matching rules and limits.
+
 ### Single-tenant, on purpose
 
 `session_path` exists on every underlying function (a monarch-api2
@@ -82,27 +104,31 @@ to `streamable-http` by default. See `config.py` / `server.py`.
 | --- | --- | --- |
 | `MONARCH_EMAIL` | Monarch account email, for automatic login | — |
 | `MONARCH_PASSWORD` | Monarch account password | — |
+| `MONARCH_PASSWORD_FILE` | Read the password from this file instead (Docker/Kubernetes secret mounts) | — |
 | `MONARCH_TOTP_SECRET` | Base32 authenticator-app seed, for automatic MFA | — |
+| `MONARCH_TOTP_SECRET_FILE` | Read the TOTP seed from this file instead | — |
 | `MONARCH_SESSION_PATH` | Exact path to the session file | `$MONARCH_CONFIG_DIR/session.json` |
 | `MONARCH_CONFIG_DIR` | Directory for the default session path | `~/.config/monarch` |
 | `MCP_TRANSPORT` | `stdio` \| `sse` \| `streamable-http` | `stdio` (Dockerfile overrides to `streamable-http`) |
 | `MCP_HOST` | Bind host for `sse`/`streamable-http` | `0.0.0.0` |
 | `MCP_PORT` | Bind port for `sse`/`streamable-http` | `8000` |
 
-Treat `MONARCH_PASSWORD` and `MONARCH_TOTP_SECRET` like any other secret —
+Treat `MONARCH_PASSWORD` and `MONARCH_TOTP_SECRET` like any other secret.
 obot's single-user MCP server model marks fields like these "sensitive"
-when an admin configures the server; use that.
+when an admin configures the server, which covers the most common obot
+deployment path; the `_FILE` variants above are for deployments layering
+obot on top of Docker/Kubernetes secret mounts instead of putting the
+value directly in the environment. See the docs'
+[Configuration page](https://dcode.github.io/monarch-mcp2-obot/configuration/)
+for details.
 
 ## Running it
 
 ### obot, command/uvx-based (stdio)
 
 ```bash
-uvx --from git+https://<your-fork-url> monarch-mcp
+uvx --from git+https://github.com/dcode/monarch-mcp2-obot monarch-mcp
 ```
-
-(Once you've pushed this fork somewhere — see the note at the end of this
-README about where this code currently lives.)
 
 ### obot, Docker-based (streamable-http)
 
@@ -127,33 +153,40 @@ without a re-login.
 ### Local development (stdio, no Docker)
 
 ```bash
-uv sync
+uv sync --extra dev
 uv run monarch-mcp
 ```
 
 ## Testing
 
 ```bash
-uv run pytest
+uv run pytest --cov=src --cov-report=term-missing
 uv run ruff check src tests
 uv run ruff format --check src tests
-uv run mypy src/monarch_mcp/auth_runtime.py src/monarch_mcp/config.py \
-  src/monarch_mcp/server.py src/monarch_mcp/groups/auth.py src/monarch_mcp/tool_metadata.py
+uv run mypy src
 ```
 
-(`mypy --strict` is scoped to the files this fork authored or substantially
-changed; the inherited group modules weren't re-audited for strict typing
-as part of this fork — see ROADMAP.md.)
+`mypy --strict` runs across the entire `src/` tree, including the 13 group
+modules inherited from upstream. Install pre-commit hooks to run the same
+checks automatically before each commit:
 
-## Where this code lives
+```bash
+uv run pre-commit install
+```
 
-This was built and verified locally (installed, tested, and run — both
-transports — against a real MCP `initialize` handshake) but has not been
-pushed to a hosted git remote as part of this work. Push it to your own
-fork/remote before pointing `uvx --from git+...` at it, and update the
-Docker build instructions above accordingly if you build from that remote
-instead of a local checkout.
+See [Development](https://dcode.github.io/monarch-mcp2-obot/development/) for more, and
+`ROADMAP.md` for what's done, known gaps, and deliberately deferred next steps.
+
+## Publishing to PyPI
+
+The package metadata (classifiers, license, URLs, a `py.typed` marker) is ready for PyPI, but an
+actual upload isn't yet possible: this project depends on `monarch-api2` via a direct GitHub
+reference (no PyPI release of that package exists), and PyPI rejects any package whose metadata
+contains a direct/VCS dependency. See "Publishing to PyPI" in the
+[Installation docs](https://dcode.github.io/monarch-mcp2-obot/installation/#publishing-to-pypi) and
+in `ROADMAP.md` for what would need to change first.
 
 ## License
 
-MIT, inherited from upstream. See `LICENSE`.
+MIT, inherited from upstream, with this fork's own additions also under MIT. See `LICENSE` and
+`NOTICE.md` for the full attribution.
