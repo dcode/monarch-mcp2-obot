@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "monarch-mcp2-obot"
+version = "0.1.0"
+description = "Single-tenant Monarch Money MCP server for self-hosting behind obot, forked from erikrubstein/monarch-mcp2 and ported to MCP Python SDK v2 (MCPServer)."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+  "mcp[cli]>=2.1.0,<3",
+  "monarch-api2 @ git+https://github.com/erikrubstein/monarch-api2.git@v0.2.0",
+  "pyotp>=2.9,<3",
+]
+
+[project.scripts]
+monarch-mcp = "monarch_mcp.server:main"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.24",
+  "ruff>=0.8",
+  "mypy>=1.13",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/monarch_mcp"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
+
+[tool.ruff.lint.per-file-ignores]
+# UP040 wants `type X = Literal[...]` (PEP 695) instead of `X: TypeAlias =
+# Literal[...]`. Don't apply it here: a PEP 695 type statement produces a
+# lazy `TypeAliasType` that Pydantic does NOT inline into a JSON Schema
+# `enum` the way it inlines a plain module-level `Literal` assignment —
+# verified empirically (every affected tool's input schema silently lost
+# its `enum` constraint) before pinning this down and reverting it. If a
+# future Pydantic version changes that, revisit — but don't let ruff
+# "helpfully" re-apply this fix without re-checking generated schemas.
+"src/monarch_mcp/schemas.py" = ["UP040"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+# monarch-api2 ships no py.typed marker / stubs (it's erikrubstein's
+# separate repo, out of scope for this fork to type-stub). Every call into
+# it is still exercised by the test suite; this only silences the
+# import-untyped noise, it doesn't skip checking our own code.
+[[tool.mypy.overrides]]
+module = "monarch_api"
+ignore_missing_imports = true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Monarch Transaction Review"
+  short_description: "Review Monarch transactions with memory"
+  default_prompt: "Use $monarch-transaction-review to prepare my Monarch transactions for human review."
+
+policy:
+  allow_implicit_invocation: true
