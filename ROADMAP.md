@@ -110,9 +110,12 @@ into this session, `zensical build --clean --strict` run against the docs,
       concern, not this server's).
 - [x] **GitHub Actions**: `lint.yml` (ruff check + format + mypy),
       `test.yml` (pytest + coverage, 3.12/3.13 matrix), `docs.yml` (zensical
-      build → GitHub Pages on push to `main`), `publish.yml` (build +
-      PyPI publish, `workflow_dispatch`-only — see "Publishing to PyPI"
-      below for why this isn't wired to `release: published`).
+      build → GitHub Pages on push to `main`), `publish.yml` (build + PyPI
+      publish via [Trusted Publishing](https://docs.pypi.org/trusted-publishers/)
+      against the `pypi` environment — no stored token — triggered by a
+      published GitHub release or manual `workflow_dispatch`; see
+      "Publishing to PyPI" below for the dependency pin that still needs to
+      change before a real release actually succeeds).
 - [x] **Pre-commit** (`.pre-commit-config.yaml`): the pre-commit-hooks
       hygiene set, ruff + ruff-format, and local mypy/pytest hooks —
       mirrors CI so failures surface before a push, not after.
