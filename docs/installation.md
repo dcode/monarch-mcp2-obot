@@ -49,6 +49,8 @@ This package is prepared for PyPI (classifiers, license, URLs, a `py.typed` mark
 **cannot** be uploaded there as-is: it depends on `monarch-api2` via a direct GitHub reference (no
 PyPI release of that package exists yet), and PyPI's upload validation rejects any package whose
 metadata contains a direct/VCS dependency. `uv build` still produces installable wheels/sdists
-locally or in CI — see the `publish` GitHub Actions workflow (manual `workflow_dispatch` only, for
-exactly this reason) — but an actual `pypi-publish` step will fail until `monarch-api2` has its own
-PyPI release to depend on instead.
+locally or in CI. The `publish` GitHub Actions workflow publishes via
+[PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/) (OIDC, no stored token) against
+the `pypi` environment, triggered by a published GitHub release or manual `workflow_dispatch` — but
+an actual `pypi-publish` step will fail until `monarch-api2` has its own PyPI release to depend on
+instead. Re-pin the dependency before tagging a release meant to actually publish.

@@ -1,14 +1,16 @@
 name: Publish
 
-# Manual dispatch only, not `release: published`. This package currently
-# depends on monarch-api2 via a direct GitHub reference (no PyPI release of
-# that dependency exists yet), and PyPI's upload validation rejects any
-# package whose metadata contains a direct/VCS `Requires-Dist` -- so a
-# `uv publish`/`gh-action-pypi-publish` push WILL be rejected by PyPI as-is.
-# See "Publishing to PyPI" in ROADMAP.md before running this. The build job
-# still produces installable wheels/sdists as workflow artifacts, useful for
-# attaching to a GitHub Release even while a real PyPI upload isn't viable.
+# Publishes via PyPI Trusted Publishing (OIDC, no stored token) against the
+# `pypi` environment. NOTE: as of this writing, this package depends on
+# monarch-api2 via a direct GitHub reference (no PyPI release of that
+# dependency exists yet), and PyPI's upload validation rejects any package
+# whose metadata contains a direct/VCS `Requires-Dist` -- so a publish run
+# against the current dependency pin will be rejected by PyPI. See
+# "Publishing to PyPI" in ROADMAP.md. Re-pin monarch-api2 to a PyPI release
+# before tagging a release that's meant to actually publish.
 on:
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
