@@ -1,0 +1,48 @@
+name: Publish
+
+# Manual dispatch only, not `release: published`. This package currently
+# depends on monarch-api2 via a direct GitHub reference (no PyPI release of
+# that dependency exists yet), and PyPI's upload validation rejects any
+# package whose metadata contains a direct/VCS `Requires-Dist` -- so a
+# `uv publish`/`gh-action-pypi-publish` push WILL be rejected by PyPI as-is.
+# See "Publishing to PyPI" in ROADMAP.md before running this. The build job
+# still produces installable wheels/sdists as workflow artifacts, useful for
+# attaching to a GitHub Release even while a real PyPI upload isn't viable.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+
+      - run: uv build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/monarch-mcp2-obot/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

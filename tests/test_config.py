@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from monarch_mcp.config import (
     configured_email,
     configured_password,
@@ -52,6 +54,40 @@ def test_credential_getters_read_environment(monkeypatch) -> None:
     assert configured_email() == "user@example.com"
     assert configured_password() == "hunter2"
     assert configured_totp_secret() == "JBSWY3DPEHPK3PXP"
+
+
+def test_configured_password_reads_from_file(monkeypatch, tmp_path) -> None:
+    secret_file = tmp_path / "password"
+    secret_file.write_text("hunter2\n", encoding="utf-8")
+    monkeypatch.setenv("MONARCH_PASSWORD_FILE", str(secret_file))
+    monkeypatch.setenv("MONARCH_PASSWORD", "should-be-ignored")
+
+    assert configured_password() == "hunter2"
+
+
+def test_configured_totp_secret_reads_from_file(monkeypatch, tmp_path) -> None:
+    secret_file = tmp_path / "totp"
+    secret_file.write_text("JBSWY3DPEHPK3PXP\n", encoding="utf-8")
+    monkeypatch.setenv("MONARCH_TOTP_SECRET_FILE", str(secret_file))
+    monkeypatch.delenv("MONARCH_TOTP_SECRET", raising=False)
+
+    assert configured_totp_secret() == "JBSWY3DPEHPK3PXP"
+
+
+def test_configured_password_falls_back_to_env_without_file(monkeypatch) -> None:
+    monkeypatch.delenv("MONARCH_PASSWORD_FILE", raising=False)
+    monkeypatch.setenv("MONARCH_PASSWORD", "hunter2")
+
+    assert configured_password() == "hunter2"
+
+
+def test_configured_password_rejects_empty_secret_file(monkeypatch, tmp_path) -> None:
+    secret_file = tmp_path / "password"
+    secret_file.write_text("   \n", encoding="utf-8")
+    monkeypatch.setenv("MONARCH_PASSWORD_FILE", str(secret_file))
+
+    with pytest.raises(ValueError, match="empty"):
+        configured_password()
 
 
 def test_transport_defaults_to_stdio(monkeypatch) -> None:

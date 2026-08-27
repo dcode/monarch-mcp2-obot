@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+from enum import Enum
 from typing import Any
 
 from monarch_api.types.cashflow import CashflowFilter
@@ -21,18 +23,27 @@ from monarch_api.types.transactions import (
 )
 from pydantic import BaseModel
 
+#: Accepted shape for every filter/update argument below: either a plain
+#: dict (as tests and library callers commonly pass) or one of the
+#: `MonarchInput` Pydantic models the MCP tool layer generates from a
+#: tool call's arguments (see schemas.py). `input_dict` normalizes either
+#: into a plain dict before it's threaded into the monarch-api2 dataclass.
+InputMapping = Mapping[str, Any] | BaseModel
 
-def input_dict(data):
+
+def input_dict(data: InputMapping | None) -> dict[str, Any] | None:
+    if data is None:
+        return None
     if isinstance(data, BaseModel):
         return data.model_dump(exclude_none=True)
-    return data
+    return dict(data)
 
 
 def category_type(value: str | None) -> CategoryType | None:
     return CategoryType(value) if value is not None else None
 
 
-def cashflow_filter(data: dict[str, Any] | None) -> CashflowFilter | None:
+def cashflow_filter(data: InputMapping | None) -> CashflowFilter | None:
     data = input_dict(data)
     if data is None:
         return None
@@ -46,7 +57,7 @@ def cashflow_filter(data: dict[str, Any] | None) -> CashflowFilter | None:
     )
 
 
-def transaction_filter(data: dict[str, Any] | None) -> TransactionFilter | None:
+def transaction_filter(data: InputMapping | None) -> TransactionFilter | None:
     data = input_dict(data)
     if data is None:
         return None
@@ -86,7 +97,7 @@ def transaction_filter(data: dict[str, Any] | None) -> TransactionFilter | None:
     )
 
 
-def recurring_filter(data: dict[str, Any] | None) -> RecurringFilter | None:
+def recurring_filter(data: InputMapping | None) -> RecurringFilter | None:
     data = input_dict(data)
     if data is None:
         return None
@@ -101,7 +112,7 @@ def recurring_filter(data: dict[str, Any] | None) -> RecurringFilter | None:
     )
 
 
-def receipt_filter(data: dict[str, Any] | None) -> ReceiptFilter | None:
+def receipt_filter(data: InputMapping | None) -> ReceiptFilter | None:
     data = input_dict(data)
     if data is None:
         return None
@@ -114,11 +125,11 @@ def receipt_filter(data: dict[str, Any] | None) -> ReceiptFilter | None:
 
 
 def receipt_line_items(
-    values: list[dict[str, Any]] | None,
+    values: Sequence[InputMapping] | None,
 ) -> list[ReceiptLineItemUpdate] | None:
     if values is None:
         return None
-    values = [input_dict(item) for item in values]
+    items = [input_dict(item) or {} for item in values]
     return [
         ReceiptLineItemUpdate(
             line_item_id=str(item["line_item_id"]),
@@ -127,14 +138,14 @@ def receipt_line_items(
             price=item.get("price"),
             quantity=item.get("quantity"),
         )
-        for item in values
+        for item in items
     ]
 
 
 def transaction_split_drafts(
-    values: list[dict[str, Any]],
+    values: Sequence[InputMapping],
 ) -> list[TransactionSplitDraft]:
-    values = [input_dict(item) for item in values]
+    items = [input_dict(item) or {} for item in values]
     return [
         TransactionSplitDraft(
             amount=item["amount"],
@@ -154,7 +165,7 @@ def transaction_split_drafts(
             tag_ids=item.get("tag_ids"),
             goal_id=item.get("goal_id"),
         )
-        for item in values
+        for item in items
     ]
 
 
@@ -162,7 +173,7 @@ def report_group(value: str | None) -> ReportGroup | None:
     return ReportGroup(value) if value is not None else None
 
 
-def report_groups(value: str | list[str] | None) -> ReportGroup | list[ReportGroup] | None:
+def report_groups(value: str | Sequence[str] | None) -> ReportGroup | list[ReportGroup] | None:
     if value is None:
         return None
     if isinstance(value, str):
@@ -186,7 +197,7 @@ def review_status(value: str | None) -> TransactionReviewStatus | None:
     return enum_or_none(TransactionReviewStatus, value)
 
 
-def enum_or_none(enum_type, value):
+def enum_or_none[E: Enum](enum_type: type[E], value: Any) -> E | None:
     if value is None:
         return None
     return enum_type(value)

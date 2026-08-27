@@ -4,11 +4,11 @@ This file stores private preferences and observed patterns for Monarch transacti
 
 ## Global Preferences
 
-- 
+-
 
 ## Note Style
 
-- 
+-
 
 ## Merchant Rules
 
@@ -23,11 +23,11 @@ Format:
 
 ## Category Rules
 
-- 
+-
 
 ## Tag Rules
 
-- 
+-
 
 ## Receipt Expectations
 
@@ -54,7 +54,7 @@ Examples:
 
 ## Account-Specific Context
 
-- 
+-
 
 ## Corrections Learned
 
@@ -69,8 +69,8 @@ Format:
 
 ## Open Questions
 
-- 
+-
 
 ## Change Log
 
-- 
+-
