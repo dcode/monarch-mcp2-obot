@@ -185,6 +185,32 @@ botched first attempt; this project starts its real releases at `v0.1.1`).
 a draft with the files already attached, then publishes it — it never
 tries to attach anything to an already-published release.
 
+## Status: done in this session (2026-08-28 — branch protection + OCI image)
+
+- [x] **Branch protection ruleset** on `main` (`gh api repos/.../rulesets`):
+      no direct commits (PR required, 0 approvals since this is effectively
+      a solo-maintainer repo — but PR + CI gate still applies to everyone,
+      no bypass actors), `required_status_checks` (`lint`, `test (3.12)`,
+      `test (3.13)`, branch must be up to date before merging), squash/rebase
+      only (`required_linear_history` + `allowed_merge_methods`), no
+      force-push, no branch deletion. Deliberately excluded `docs.yml`'s
+      `deploy` job and `publish.yml`'s `build`/`release`/`publish` jobs from
+      required checks — none of them run on `pull_request`, so requiring
+      them would permanently block every PR merge.
+- [x] **OCI image published to GHCR** (`.github/workflows/docker.yml`):
+      builds and pushes `ghcr.io/dcode/monarch-mcp2-obot` on a pushed
+      `vX.Y.Z` tag, multi-arch (`linux/amd64`, `linux/arm64`), tagged
+      `{version}`, `{major}.{minor}`, and `latest` (auto). obot's
+      Docker-based deployment model can now pull a released image directly
+      instead of building locally — see "Installation" in the docs and the
+      README's "obot, Docker-based" section.
+- [x] Dockerfile now copies `LICENSE`/`NOTICE.md` into the build context so
+      hatchling's license-files auto-detection actually finds them inside
+      the image, matching what a local `uv build` already produces; added
+      baseline `org.opencontainers.image.*` labels (title, description,
+      source, licenses) — per-build labels (revision, created, version) are
+      layered on top by `docker/metadata-action` in CI.
+
 ## Known gaps / deliberately deferred
 
 - **`schemas.py` intentionally does NOT use PEP 695 `type X = ...`

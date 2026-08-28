@@ -14,8 +14,9 @@ Point obot's command-based MCP server configuration at that command. Configure
 
 ## obot, Docker-based (streamable-http)
 
+Pull the published image — no local build needed:
+
 ```bash
-docker build -t monarch-mcp2-obot:local .
 docker volume create monarch-session
 
 docker run -d --rm \
@@ -24,8 +25,14 @@ docker run -d --rm \
   -e MONARCH_EMAIL=you@example.com \
   -e MONARCH_PASSWORD=... \
   -e MONARCH_TOTP_SECRET=...  `# omit if your account doesn't use authenticator-app MFA` \
-  monarch-mcp2-obot:local
+  ghcr.io/dcode/monarch-mcp2-obot:latest
 ```
+
+`:latest` tracks the newest tagged release; pin a specific version (`:0.1.2`, `:0.1`, ...) for a
+reproducible deployment — see the
+[package's tags](https://github.com/dcode/monarch-mcp2-obot/pkgs/container/monarch-mcp2-obot).
+Images are multi-arch (`linux/amd64`, `linux/arm64`), built from each pushed release tag by
+`.github/workflows/docker.yml`.
 
 Point obot's Docker-based MCP server config at this container's `streamable-http` endpoint on port
 8000. Session state lives in the `monarch-session` volume, so it survives container restarts and
@@ -33,6 +40,9 @@ re-deploys without a re-login.
 
 The image runs as a non-root `monarch` user and defaults `MCP_TRANSPORT` to `streamable-http` —
 obot's Docker deployment model expects a port and an HTTP/SSE endpoint, not stdio.
+
+Building locally instead of pulling is still supported: `docker build -t monarch-mcp2-obot:local .`,
+then use that tag in place of the `ghcr.io` image above.
 
 ## Local development (stdio, no Docker)
 
