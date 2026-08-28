@@ -59,11 +59,14 @@ This package is prepared for PyPI (classifiers, license, URLs, a `py.typed` mark
 **cannot** be uploaded there as-is: it depends on `monarch-api2` via a direct GitHub reference (no
 PyPI release of that package exists yet), and PyPI's upload validation rejects any package whose
 metadata contains a direct/VCS dependency. `uv build` still produces installable wheels/sdists
-locally or in CI. The `publish` GitHub Actions workflow builds on every published GitHub release and:
+locally or in CI. The `publish` GitHub Actions workflow has two independent jobs:
 
-- **Attaches the wheel/sdist to the release** (runs automatically on `release: published`) — the
-  primary distribution path for now.
-- **Publishes to PyPI** via [Trusted Publishing](https://docs.pypi.org/trusted-publishers/) (OIDC,
+- **Release**: on a pushed `vX.Y.Z` tag, builds the wheel/sdist and turns the tag into a GitHub
+  release with those files attached — the primary distribution path for now. GitHub releases are
+  immutable once published (assets can only be uploaded *before* publishing), so this creates the
+  release as a draft with the files already attached, then publishes it — never reacts to an
+  already-published release, since by then it's too late to attach anything.
+- **Publish to PyPI** via [Trusted Publishing](https://docs.pypi.org/trusted-publishers/) (OIDC,
   no stored token) against the `pypi` environment — `workflow_dispatch` only, not automatic on a
-  release, since it will fail until `monarch-api2` has its own PyPI release to depend on instead. Re-pin
-  the dependency, then consider switching this job back to the `release: published` trigger.
+  tag push, since it will fail until `monarch-api2` has its own PyPI release to depend on instead.
+  Re-pin the dependency, then consider making this automatic too.

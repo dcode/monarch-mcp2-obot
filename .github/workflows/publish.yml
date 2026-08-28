@@ -2,23 +2,39 @@ name: Publish
 
 # Two independent distribution paths from the same build:
 #
-# 1. Attach the built wheel/sdist to the GitHub release itself (runs
-#    automatically on every published release). This is the primary
-#    distribution path for now: semantic-versioned tags plus immutable,
-#    downloadable release assets, no PyPI dependency.
+# 1. Build the wheel/sdist and turn a pushed `vX.Y.Z` tag into a GitHub
+#    release with those files attached -- the primary distribution path
+#    for now (semantic-versioned tags, immutable release assets, no PyPI
+#    dependency).
+#
+#    GitHub releases are immutable once published: assets can only be
+#    uploaded to a release *before* it's published, not after (uploading
+#    after publish fails with "Cannot upload asset ... to an immutable
+#    release"). So this can't be a `release: published` reaction anymore --
+#    by the time that event fires, it's already too late to attach
+#    anything. Instead: build first, create the release as a draft with
+#    the files attached (drafts allow uploads), then publish it -- assets
+#    are already in place by the time it locks.
+#
+#    Release notes are auto-generated from merged PRs since the previous
+#    tag (`generate_release_notes: true`); edit them after the fact with
+#    `gh release edit <tag> --notes "..."` if you want something more
+#    curated -- editing title/notes text isn't blocked by immutability,
+#    only asset uploads are.
+#
 # 2. Publish to PyPI via Trusted Publishing (OIDC, no stored token) against
-#    the `pypi` environment (manual `workflow_dispatch` only, not automatic
-#    on a release). NOTE: as of this writing, this package depends on
-#    monarch-api2 via a direct GitHub reference (no PyPI release of that
-#    dependency exists yet), and PyPI's upload validation rejects any
-#    package whose metadata contains a direct/VCS `Requires-Dist` -- so a
-#    publish run against the current dependency pin will be rejected by
+#    the `pypi` environment -- manual `workflow_dispatch` only, not
+#    automatic on a tag push. NOTE: as of this writing, this package
+#    depends on monarch-api2 via a direct GitHub reference (no PyPI release
+#    of that dependency exists yet), and PyPI's upload validation rejects
+#    any package whose metadata contains a direct/VCS `Requires-Dist` -- so
+#    a publish run against the current dependency pin will be rejected by
 #    PyPI. See "Publishing to PyPI" in ROADMAP.md. Re-pin monarch-api2 to a
-#    PyPI release before running this, then consider switching this job
-#    back to the `release: published` trigger.
+#    PyPI release before running this.
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
 
 permissions:
@@ -41,9 +57,9 @@ jobs:
           name: dist
           path: dist/
 
-  attach-release-assets:
+  release:
     needs: build
-    if: github.event_name == 'release'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -55,7 +71,14 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
           files: dist/*
+          draft: true
+          generate_release_notes: true
+
+      - run: gh release edit "${{ github.ref_name }}" --draft=false
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   publish:
     needs: build
