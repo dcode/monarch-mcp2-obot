@@ -11,14 +11,22 @@
 
 FROM python:3.12-slim AS base
 
+LABEL org.opencontainers.image.title="monarch-mcp2-obot" \
+      org.opencontainers.image.description="Single-tenant Monarch Money MCP server for self-hosting behind obot" \
+      org.opencontainers.image.source="https://github.com/dcode/monarch-mcp2-obot" \
+      org.opencontainers.image.licenses="MIT"
+
 COPY --from=ghcr.io/astral-sh/uv:0.8.17 /uv /uvx /usr/local/bin/
 
 WORKDIR /app
 
 # Build from this repo's own source — unlike the upstream repos surveyed
 # earlier in this project, there's no separate git history to pin here;
-# COPY captures exactly the commit you're building from.
-COPY pyproject.toml README.md ./
+# COPY captures exactly the commit you're building from. LICENSE/NOTICE.md
+# are included so hatchling's license-files auto-detection actually finds
+# them and bundles them into the installed wheel's dist-info, same as a
+# local `uv build` does.
+COPY pyproject.toml README.md LICENSE NOTICE.md ./
 COPY src ./src
 
 # monarch-api2 is still fetched from its own repo at build time (pinned to
