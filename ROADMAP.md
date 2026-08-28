@@ -111,13 +111,14 @@ into this session, `zensical build --clean --strict` run against the docs,
 - [x] **GitHub Actions**: `lint.yml` (ruff check + format + mypy),
       `test.yml` (pytest + coverage, 3.12/3.13 matrix), `docs.yml` (zensical
       build → GitHub Pages on push to `main`), `publish.yml` (build, then two
-      independent paths: attach the wheel/sdist to the GitHub release
-      automatically on `release: published` — the primary distribution path
-      for now — and, separately, PyPI publish via
+      independent paths: on a pushed `vX.Y.Z` tag, build and turn it into a
+      GitHub release with the wheel/sdist attached — the primary
+      distribution path for now — and, separately, PyPI publish via
       [Trusted Publishing](https://docs.pypi.org/trusted-publishers/) against
       the `pypi` environment on manual `workflow_dispatch` only; see
-      "Publishing to PyPI" below for why PyPI isn't wired to the release
-      trigger yet).
+      "Distribution" below for why PyPI isn't automatic, and for the
+      draft-then-publish dance the release job does to work around GitHub's
+      immutable-release asset rules).
 - [x] **Pre-commit** (`.pre-commit-config.yaml`): the pre-commit-hooks
       hygiene set, ruff + ruff-format, and local mypy/pytest hooks —
       mirrors CI so failures surface before a push, not after.
@@ -162,8 +163,8 @@ issue was opened upstream to ask about the relationship between the two
 packages.
 
 So for now, **GitHub Releases are the primary distribution path**:
-`publish.yml`'s `attach-release-assets` job builds the wheel/sdist and
-attaches them to the release automatically on `release: published`, giving
+`publish.yml`'s `release` job builds the wheel/sdist on a pushed `vX.Y.Z`
+tag and turns it into a GitHub release with those files attached, giving
 semantic-versioned tags and immutable, downloadable artifacts without
 depending on PyPI at all — see "Releases" in the README. The `publish` job
 (actual PyPI upload via Trusted Publishing) stays on manual
@@ -173,8 +174,16 @@ this fork's call to make unilaterally: get `monarch-api2` published to
 PyPI (upstream, `erikrubstein/monarch-api2`) and re-pin the dependency to
 that; or vendor/fork `monarch-api2` under this project's own namespace and
 publish that instead. Once either happens, re-pin the dependency, drop
-`allow-direct-references`, and switch the `publish` job back to the
-`release: published` trigger.
+`allow-direct-references`, and consider making PyPI publish automatic too.
+
+**GitHub releases are immutable once published** — assets can only be
+uploaded to a release *before* it's published, and once a tag name has
+been used for a published release, that name can't be reused even if the
+release is later deleted (learned this the hard way burning `v0.1.0` on a
+botched first attempt; this project starts its real releases at `v0.1.1`).
+`publish.yml`'s `release` job accounts for this: it creates the release as
+a draft with the files already attached, then publishes it — it never
+tries to attach anything to an already-published release.
 
 ## Known gaps / deliberately deferred
 
@@ -226,8 +235,8 @@ publish that instead. Once either happens, re-pin the dependency, drop
   contributor to the 80%-not-100% baseline) and the inherited group
   modules, then raise `fail_under` to match.
 - If `monarch-api2` gets a PyPI release, re-pin `dependencies` to it,
-  drop `allow-direct-references`, and switch `publish.yml` back to
-  `release: published`.
+  drop `allow-direct-references`, and make `publish.yml`'s `publish` job
+  run automatically on a tag push instead of `workflow_dispatch`-only.
 - If a real Monarch 401 message is ever observed that
   `reauth.py::_EXPIRED_SESSION_MARKERS` doesn't match, add it — this is
   meant to grow from observed behavior, not be guessed exhaustively
