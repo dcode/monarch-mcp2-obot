@@ -9,12 +9,15 @@
 # no container needed). Override with MCP_TRANSPORT=stdio if you want to
 # run this image itself over stdio (`docker run -i`).
 
-FROM python:3.12-slim AS base
+FROM python:3.12-slim AS builder
 
-LABEL org.opencontainers.image.title="monarch-mcp2-obot" \
-      org.opencontainers.image.description="Single-tenant Monarch Money MCP server for self-hosting behind obot" \
-      org.opencontainers.image.source="https://github.com/dcode/monarch-mcp2-obot" \
-      org.opencontainers.image.licenses="MIT"
+# git is required at build time only: uv needs it to fetch monarch-api2
+# from its GitHub pin (see pyproject.toml's dependencies) -- python:3.12-slim
+# doesn't ship it. Not needed at runtime, so this stays out of the final
+# image via the multi-stage split below.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:0.8.17 /uv /uvx /usr/local/bin/
 
@@ -33,6 +36,21 @@ COPY src ./src
 # a tag in pyproject.toml's dependency spec) — bump that pin deliberately,
 # not by floating to its default branch.
 RUN uv venv && uv pip install .
+
+FROM python:3.12-slim AS base
+
+LABEL org.opencontainers.image.title="monarch-mcp2-obot" \
+      org.opencontainers.image.description="Single-tenant Monarch Money MCP server for self-hosting behind obot" \
+      org.opencontainers.image.source="https://github.com/dcode/monarch-mcp2-obot" \
+      org.opencontainers.image.licenses="MIT"
+
+WORKDIR /app
+
+# Same WORKDIR/base image as the builder stage, so the venv's absolute
+# paths (shebangs, pyvenv.cfg) stay valid without needing --system-site or
+# a re-link step -- .venv/bin/python3 is a symlink to the interpreter this
+# stage's own `FROM python:3.12-slim` already provides.
+COPY --from=builder /app/.venv /app/.venv
 
 ENV MONARCH_SESSION_PATH=/data/session.json \
     MCP_TRANSPORT=streamable-http \
