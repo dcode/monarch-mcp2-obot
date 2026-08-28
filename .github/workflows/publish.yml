@@ -76,7 +76,7 @@ jobs:
           draft: true
           generate_release_notes: true
 
-      - run: gh release edit "${{ github.ref_name }}" --draft=false
+      - run: gh release edit "${{ github.ref_name }}" --draft=false -R "${{ github.repository }}"
         env:
           GH_TOKEN: ${{ github.token }}
 
