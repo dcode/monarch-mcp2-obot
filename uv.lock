@@ -822,7 +822,7 @@ docs = [
 requires-dist = [
     { name = "mcp", extras = ["cli"], specifier = ">=2.1.0,<3" },
     { name = "monarch-api2", git = "https://github.com/erikrubstein/monarch-api2.git?rev=v0.2.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.15" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "pyotp", specifier = ">=2.9,<3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
