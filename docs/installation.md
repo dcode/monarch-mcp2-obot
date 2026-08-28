@@ -43,14 +43,27 @@ uv run monarch-mcp
 
 See [Development](development.md) for running the test suite, linters, and type checker.
 
+## Installing a specific version
+
+Until a PyPI release is possible (see below), a released wheel/sdist is available from each
+[GitHub release](https://github.com/dcode/monarch-mcp2-obot/releases) as a downloadable asset,
+giving semantic-versioned tags and immutable, content-addressed artifacts without needing PyPI:
+
+```bash
+pip install https://github.com/dcode/monarch-mcp2-obot/releases/download/vX.Y.Z/monarch_mcp2_obot-X.Y.Z-py3-none-any.whl
+```
+
 ## Publishing to PyPI
 
 This package is prepared for PyPI (classifiers, license, URLs, a `py.typed` marker) but currently
 **cannot** be uploaded there as-is: it depends on `monarch-api2` via a direct GitHub reference (no
 PyPI release of that package exists yet), and PyPI's upload validation rejects any package whose
 metadata contains a direct/VCS dependency. `uv build` still produces installable wheels/sdists
-locally or in CI. The `publish` GitHub Actions workflow publishes via
-[PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/) (OIDC, no stored token) against
-the `pypi` environment, triggered by a published GitHub release or manual `workflow_dispatch` — but
-an actual `pypi-publish` step will fail until `monarch-api2` has its own PyPI release to depend on
-instead. Re-pin the dependency before tagging a release meant to actually publish.
+locally or in CI. The `publish` GitHub Actions workflow builds on every published GitHub release and:
+
+- **Attaches the wheel/sdist to the release** (runs automatically on `release: published`) — the
+  primary distribution path for now.
+- **Publishes to PyPI** via [Trusted Publishing](https://docs.pypi.org/trusted-publishers/) (OIDC,
+  no stored token) against the `pypi` environment — `workflow_dispatch` only, not automatic on a
+  release, since it will fail until `monarch-api2` has its own PyPI release to depend on instead. Re-pin
+  the dependency, then consider switching this job back to the `release: published` trigger.
