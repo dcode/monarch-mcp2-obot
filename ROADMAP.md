@@ -110,12 +110,14 @@ into this session, `zensical build --clean --strict` run against the docs,
       concern, not this server's).
 - [x] **GitHub Actions**: `lint.yml` (ruff check + format + mypy),
       `test.yml` (pytest + coverage, 3.12/3.13 matrix), `docs.yml` (zensical
-      build → GitHub Pages on push to `main`), `publish.yml` (build + PyPI
-      publish via [Trusted Publishing](https://docs.pypi.org/trusted-publishers/)
-      against the `pypi` environment — no stored token — triggered by a
-      published GitHub release or manual `workflow_dispatch`; see
-      "Publishing to PyPI" below for the dependency pin that still needs to
-      change before a real release actually succeeds).
+      build → GitHub Pages on push to `main`), `publish.yml` (build, then two
+      independent paths: attach the wheel/sdist to the GitHub release
+      automatically on `release: published` — the primary distribution path
+      for now — and, separately, PyPI publish via
+      [Trusted Publishing](https://docs.pypi.org/trusted-publishers/) against
+      the `pypi` environment on manual `workflow_dispatch` only; see
+      "Publishing to PyPI" below for why PyPI isn't wired to the release
+      trigger yet).
 - [x] **Pre-commit** (`.pre-commit-config.yaml`): the pre-commit-hooks
       hygiene set, ruff + ruff-format, and local mypy/pytest hooks —
       mirrors CI so failures surface before a push, not after.
@@ -139,7 +141,7 @@ into this session, `zensical build --clean --strict` run against the docs,
 - [x] Pushed to a real remote: `https://github.com/dcode/monarch-mcp2-obot`
       (the README's `uvx --from git+...` placeholder is now the real URL).
 
-## Publishing to PyPI
+## Distribution: GitHub Releases for now, PyPI later
 
 The metadata is ready, but an actual `pypi-publish` will fail: this project
 depends on `monarch-api2` via a direct GitHub reference (`@ git+https://...`
@@ -147,13 +149,32 @@ in `dependencies`, `allow-direct-references = true` in
 `[tool.hatch.metadata]`), because `monarch-api2` has no PyPI release to
 depend on instead. PyPI's upload validation rejects any package whose
 metadata contains a direct/VCS `Requires-Dist` line — this isn't a bug in
-this fork's setup, it's PyPI's policy. `publish.yml` is `workflow_dispatch`
-only (not triggered by `release: published`) specifically so this doesn't
-silently fail on every tagged release. Two ways to actually unblock a PyPI
-upload, neither of which is this fork's call to make unilaterally: get
-`monarch-api2` published to PyPI (upstream, `erikrubstein/monarch-api2`) and
-re-pin the dependency to that; or vendor/fork `monarch-api2` under this
-project's own namespace and publish that instead.
+this fork's setup, it's PyPI's policy.
+
+A `monarch-api` package also exists on PyPI under the same author
+(erikrubstein) and the same `monarch_api` import name, but it's not a
+drop-in replacement: a full audit of this fork's 127 tools against its
+actual client surface found ~28% coverage — entire groups this fork
+exposes (receipts, most of budget, most of goals, categories CRUD, tags
+CRUD, investment holdings, saved reports, transaction splits) have no
+equivalent there. Not pursuing that path unless/until it changes; a GitHub
+issue was opened upstream to ask about the relationship between the two
+packages.
+
+So for now, **GitHub Releases are the primary distribution path**:
+`publish.yml`'s `attach-release-assets` job builds the wheel/sdist and
+attaches them to the release automatically on `release: published`, giving
+semantic-versioned tags and immutable, downloadable artifacts without
+depending on PyPI at all — see "Releases" in the README. The `publish` job
+(actual PyPI upload via Trusted Publishing) stays on manual
+`workflow_dispatch` only, so it doesn't silently fail on every tagged
+release. Two ways to actually unblock a PyPI upload, neither of which is
+this fork's call to make unilaterally: get `monarch-api2` published to
+PyPI (upstream, `erikrubstein/monarch-api2`) and re-pin the dependency to
+that; or vendor/fork `monarch-api2` under this project's own namespace and
+publish that instead. Once either happens, re-pin the dependency, drop
+`allow-direct-references`, and switch the `publish` job back to the
+`release: published` trigger.
 
 ## Known gaps / deliberately deferred
 

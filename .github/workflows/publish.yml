@@ -1,13 +1,21 @@
 name: Publish
 
-# Publishes via PyPI Trusted Publishing (OIDC, no stored token) against the
-# `pypi` environment. NOTE: as of this writing, this package depends on
-# monarch-api2 via a direct GitHub reference (no PyPI release of that
-# dependency exists yet), and PyPI's upload validation rejects any package
-# whose metadata contains a direct/VCS `Requires-Dist` -- so a publish run
-# against the current dependency pin will be rejected by PyPI. See
-# "Publishing to PyPI" in ROADMAP.md. Re-pin monarch-api2 to a PyPI release
-# before tagging a release that's meant to actually publish.
+# Two independent distribution paths from the same build:
+#
+# 1. Attach the built wheel/sdist to the GitHub release itself (runs
+#    automatically on every published release). This is the primary
+#    distribution path for now: semantic-versioned tags plus immutable,
+#    downloadable release assets, no PyPI dependency.
+# 2. Publish to PyPI via Trusted Publishing (OIDC, no stored token) against
+#    the `pypi` environment (manual `workflow_dispatch` only, not automatic
+#    on a release). NOTE: as of this writing, this package depends on
+#    monarch-api2 via a direct GitHub reference (no PyPI release of that
+#    dependency exists yet), and PyPI's upload validation rejects any
+#    package whose metadata contains a direct/VCS `Requires-Dist` -- so a
+#    publish run against the current dependency pin will be rejected by
+#    PyPI. See "Publishing to PyPI" in ROADMAP.md. Re-pin monarch-api2 to a
+#    PyPI release before running this, then consider switching this job
+#    back to the `release: published` trigger.
 on:
   release:
     types: [published]
@@ -33,8 +41,25 @@ jobs:
           name: dist
           path: dist/
 
+  attach-release-assets:
+    needs: build
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: dist
+          path: dist/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+
   publish:
     needs: build
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment:
       name: pypi

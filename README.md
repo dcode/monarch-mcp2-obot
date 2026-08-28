@@ -177,6 +177,16 @@ uv run pre-commit install
 See [Development](https://dcode.github.io/monarch-mcp2-obot/development/) for more, and
 `ROADMAP.md` for what's done, known gaps, and deliberately deferred next steps.
 
+## Releases
+
+Until a PyPI release is possible (see below), install a specific version from its
+[GitHub release](https://github.com/dcode/monarch-mcp2-obot/releases) — semantic-versioned tags,
+with the built wheel/sdist attached as immutable release assets:
+
+```bash
+pip install https://github.com/dcode/monarch-mcp2-obot/releases/download/vX.Y.Z/monarch_mcp2_obot-X.Y.Z-py3-none-any.whl
+```
+
 ## Publishing to PyPI
 
 The package metadata (classifiers, license, URLs, a `py.typed` marker) is ready for PyPI, but an
