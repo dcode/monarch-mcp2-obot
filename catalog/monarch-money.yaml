@@ -1,0 +1,42 @@
+name: Monarch Money
+description: |
+  Single-tenant Monarch Money MCP server. One deployment maps to exactly one
+  Monarch account, configured once via the email/password/TOTP fields below --
+  no interactive login or browser step required.
+
+  125 tools across 14 groups: accounts, transactions, budget, cashflow,
+  categories, goals, household, investments, merchants, receipts, recurring
+  transactions, reports, and tags -- plus `auth_login` / `auth_status` for
+  troubleshooting login by hand if the automatic flow ever needs help.
+
+  Not affiliated with, endorsed by, or supported by Monarch Money.
+entryKey: monarch-money
+metadata:
+  categories: Personal Finance
+repoURL: https://github.com/dcode/monarch-mcp2-obot
+serverUserType: singleUser
+runtime: containerized
+containerizedConfig:
+  image: ghcr.io/dcode/monarch-mcp2-obot:0.1.3
+  port: 8000
+  path: /mcp
+env:
+  - key: MONARCH_EMAIL
+    name: Monarch Email
+    required: true
+    sensitive: false
+    description: Monarch Money account email address.
+  - key: MONARCH_PASSWORD
+    name: Monarch Password
+    required: true
+    sensitive: true
+    description: Monarch Money account password.
+  - key: MONARCH_TOTP_SECRET
+    name: Monarch TOTP Secret
+    required: false
+    sensitive: true
+    description: >-
+      Base32 authenticator-app seed (the same secret an authenticator app
+      would be enrolled with), for fully automatic MFA. Leave blank if the
+      account doesn't use authenticator-app MFA -- an MFA challenge then
+      surfaces through the auth_login tool for a human to solve once.

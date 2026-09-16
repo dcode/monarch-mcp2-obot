@@ -211,6 +211,31 @@ tries to attach anything to an already-published release.
       source, licenses) — per-build labels (revision, created, version) are
       layered on top by `docker/metadata-action` in CI.
 
+## Status: done in this session (2026-09-16 — obot GitOps catalog entry)
+
+- [x] `catalog/monarch-money.yaml`: an Obot [MCP Server
+      GitOps](https://docs.obot.ai/configuration/mcp-server-gitops) catalog
+      entry — `runtime: containerized` pinned to the published `0.1.3`
+      image, port `8000`, path `/mcp` (this server's default
+      `streamable_http_path`); `serverUserType: singleUser` (Obot's "each
+      user gets their own isolated instance" model — matches this fork's
+      single-tenant design); `MONARCH_EMAIL`/`MONARCH_PASSWORD` (required)
+      and `MONARCH_TOTP_SECRET` (optional) declared as env fields, the
+      latter two `sensitive: true` so Obot prompts for them as secrets
+      rather than plain text.
+- [x] `.obotcatalogs` scoping Obot's recursive catalog-file scan to
+      `catalog/*.yaml` — without it, Obot's default `*.yaml`/`*.yml`/`*.json`
+      scan would also try (and fail) to parse this repo's
+      `.pre-commit-config.yaml` as a catalog entry; `.github/` is skipped
+      automatically as a hidden directory, but that file lives at the repo
+      root, not inside one.
+- [ ] **Not done here, deliberately**: adding this repo as a Git Source URL
+      under Obot's admin UI (**MCP Management → MCP Catalog → Git Source
+      URLs**), and entering the real `MONARCH_EMAIL`/`MONARCH_PASSWORD`/
+      `MONARCH_TOTP_SECRET` values when connecting the catalog entry. Both
+      are one-time actions against the live Obot instance by whoever owns
+      the Monarch account — not something to script through a repo commit.
+
 ## Known gaps / deliberately deferred
 
 - **`schemas.py` intentionally does NOT use PEP 695 `type X = ...`
