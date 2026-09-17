@@ -10,6 +10,10 @@ description: |
   troubleshooting login by hand if the automatic flow ever needs help.
 
   Not affiliated with, endorsed by, or supported by Monarch Money.
+shortDescription: >-
+  Single-tenant MCP server for Monarch Money: 125 tools across 14 groups
+  (transactions, budget, accounts, and more), configured once per account.
+icon: https://www.monarch.com/favicon.ico
 entryKey: monarch-money
 metadata:
   categories: Personal Finance
@@ -17,9 +21,10 @@ repoURL: https://github.com/dcode/monarch-mcp2-obot
 serverUserType: singleUser
 runtime: containerized
 containerizedConfig:
-  image: ghcr.io/dcode/monarch-mcp2-obot:0.1.3
+  image: ghcr.io/dcode/monarch-mcp2-obot:0.1.4
   port: 8000
   path: /mcp
+  healthz: /health
 env:
   - key: MONARCH_EMAIL
     name: Monarch Email
