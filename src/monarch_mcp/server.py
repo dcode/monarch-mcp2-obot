@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 
 from mcp.server.mcpserver import MCPServer
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 
 from monarch_mcp import config
 from monarch_mcp.auth_runtime import ensure_authenticated
@@ -42,6 +44,21 @@ def create_mcp() -> MCPServer:
     budget.register(mcp)
     transactions.register(mcp)
     receipts.register(mcp)
+
+    # Plain liveness probe for container orchestrators (obot's Docker-based
+    # deployment model asks for a `healthz` path in the catalog entry). This
+    # deliberately does *not* check Monarch session/auth state -- a stale or
+    # missing session shouldn't make the orchestrator restart an otherwise
+    # healthy process, and auth_status is already the right tool for that.
+    # mcp.server.mcpserver.MCPServer.custom_route has no return type
+    # annotation of its own, so mypy --strict can't see that the closure
+    # it hands back is fully typed and flags every use as an untyped
+    # decorator. Nothing we can fix on our side short of re-typing
+    # upstream.
+    @mcp.custom_route("/health", methods=["GET"], include_in_schema=False)  # type: ignore[untyped-decorator]
+    async def health(_request: Request) -> Response:
+        return JSONResponse({"status": "ok"})
+
     return mcp
 
 
