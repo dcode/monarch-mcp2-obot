@@ -236,6 +236,37 @@ tries to attach anything to an already-published release.
       are one-time actions against the live Obot instance by whoever owns
       the Monarch account — not something to script through a repo commit.
 
+## Status: done in this session (2026-09-16 — `.obotcatalogs` fix, entry wasn't syncing)
+
+The Git Source URL was added in Obot, but the "Monarch Money" entry never appeared in
+the catalog. Not an Obot bug — confirmed by reading the exact tagged source for the
+deployed chart version (`v0.25.2`,
+`pkg/controller/handlers/mcpcatalog/mcpcatalog.go::readCatalogDirectory`):
+
+- [x] Root cause: at v0.25.2, `.obotcatalogs` include-patterns are matched with
+      `filepath.Match(pattern, filepath.Base(relPath))` — **always against the bare
+      filename**, regardless of whether the pattern itself contains a `/`. Go's
+      `filepath.Match` requires equal path-segment counts between pattern and input, so
+      a two-segment pattern like `catalog/*.yaml` can never match a one-segment
+      basename like `monarch-money.yaml` — it matched zero files, silently. (A newer
+      Obot release does make `.obotcatalogs` path-aware for patterns containing `/`;
+      that behavior doesn't exist yet in the chart version deployed here. Confirmed by
+      diffing this file's source between the `v0.25.2` tag and current `main`.) Sync
+      failures/misses like this are logged server-side only (`log.Warnf`/`log.Debugf`),
+      never surfaced in the admin UI — nothing looked broken, the entry just never
+      existed.
+- [x] Fix: deleted `.obotcatalogs` entirely, so Obot falls back to its default
+      `*.json`/`*.yaml`/`*.yml` patterns — which, since they also match on bare
+      filename only, correctly find `catalog/monarch-money.yaml` regardless of depth on
+      *any* Obot version. Added `.ignoreobotcatalogs` with `.pre-commit-config.yaml`
+      instead — ignore-patterns are matched against the *full* relative path even at
+      v0.25.2, and a bare filename pattern for a repo-root file works identically before
+      and after the newer path-aware behavior ships, so this doesn't need revisiting on
+      a future Obot upgrade.
+- [ ] **Not done here**: re-syncing (or waiting up to the hourly auto-resync for) the
+      Git Source URL in Obot after this merges, and confirming "Monarch Money" appears
+      in the catalog.
+
 ## Known gaps / deliberately deferred
 
 - **`schemas.py` intentionally does NOT use PEP 695 `type X = ...`
