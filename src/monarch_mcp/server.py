@@ -50,7 +50,12 @@ def create_mcp() -> MCPServer:
     # deliberately does *not* check Monarch session/auth state -- a stale or
     # missing session shouldn't make the orchestrator restart an otherwise
     # healthy process, and auth_status is already the right tool for that.
-    @mcp.custom_route("/health", methods=["GET"], include_in_schema=False)
+    # mcp.server.mcpserver.MCPServer.custom_route has no return type
+    # annotation of its own, so mypy --strict can't see that the closure
+    # it hands back is fully typed and flags every use as an untyped
+    # decorator. Nothing we can fix on our side short of re-typing
+    # upstream.
+    @mcp.custom_route("/health", methods=["GET"], include_in_schema=False)  # type: ignore[untyped-decorator]
     async def health(_request: Request) -> Response:
         return JSONResponse({"status": "ok"})
 
