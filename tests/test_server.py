@@ -4,9 +4,24 @@ import json
 
 import pytest
 from monarch_api import Account
+from starlette.testclient import TestClient
 
 from monarch_mcp.groups import accounts
 from monarch_mcp.server import create_mcp
+
+
+def test_health_endpoint_reports_ok_without_auth() -> None:
+    """The `/health` route is a plain liveness probe for the container
+    orchestrator (obot's catalog `healthz` field) -- it must respond
+    without a Monarch session and without MCP protocol framing."""
+    mcp = create_mcp()
+    app = mcp.streamable_http_app()
+
+    with TestClient(app) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
 
 
 @pytest.mark.anyio
